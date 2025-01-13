@@ -4,3 +4,8 @@ media/
 node_modules/
 package-lock.json
 .env
+session-manager-bundle
+static
+staticfiles
+temp
+sessionmanager-bundle.zip

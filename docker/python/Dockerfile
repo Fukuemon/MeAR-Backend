@@ -1,9 +1,25 @@
-FROM python:3.9
+# ベースイメージ
+FROM python:3.11
+
+# 環境変数設定
+ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
+
+# 作業ディレクトリの作成
 WORKDIR /app
-COPY ../../requirements.txt /app/requirements.txt
-RUN pip install -r requirements.txt
-COPY ../.. /app
+
+# 必要なパッケージをインストール
+COPY requirements.txt /app/
+RUN pip install --no-cache-dir -r requirements.txt
+
+# アプリケーションコードをコピー
+COPY . /app/
+
+# Gunicornのポート設定
 EXPOSE 8000
-RUN apt-get update && apt install wait-for-it
-ENTRYPOINT wait-for-it db:5432 -t 0 && python manage.py makemigrations && python manage.py migrate && python manage.py runserver 0.0.0.0:8000
+
+# エントリーポイントスクリプトを追加
+COPY ./docker/python/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]

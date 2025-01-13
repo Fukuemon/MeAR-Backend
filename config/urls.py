@@ -17,6 +17,9 @@ from rest_framework_simplejwt.views import TokenVerifyView
 from apps.accounts.views import LoginView
 from config import settings
 
+# HealthCheck
+from config.health import HealthCheckView
+
 schema_view = get_schema_view(
     openapi.Info(
         title="Snippets API",
@@ -52,6 +55,9 @@ urlpatterns = [
     path("account/", include("apps.accounts.urls")),
     path("profile/", include("apps.profiles.urls")),
     path("post/", include("apps.posts.urls")),
+    path("health/", HealthCheckView.as_view(), name="health-check"),
 ]
 
-urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

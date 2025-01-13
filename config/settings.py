@@ -9,35 +9,30 @@ https://docs.djangoproject.com/en/4.2/topics/settings/
 For the full list of settings and their values, see 
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
-
+import logging
 import os
 from datetime import timedelta
 from pathlib import Path
 
+from corsheaders.defaults import default_headers
 from decouple import config
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
+# BASE_DIR設定
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
+# 環境設定
+DEBUG = config("DEBUG", default=True, cast=bool)
+logging.info(f"DEBUG mode is set to: {DEBUG}")
 
-DEBUG = config("DEBUG")
+SECRET_KEY = config("SECRET_KEY", default="your-secret-key")
 
-# ALLOWED_HOSTS
-ALLOWED_HOSTS = [
-    "localhost",
-    "127.0.0.1",
-    "http://localhost:3000",
-    "http://localhost:8000",
-]
-# 本番環境の追加設定
-if not DEBUG:
-    ALLOWED_HOSTS += ["57.180.136.205", "https://mear.vercel.app"]
+# セキュリティ設定
+ALLOWED_HOSTS = config(
+    "ALLOWED_HOSTS",
+    default="*",
+).split(",")
 
-SECRET_KEY = config("SECRET_KEY")
-
-# Application definition
+# アプリケーション
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -58,11 +53,12 @@ INSTALLED_APPS = [
     "storages",
 ]
 
+# ミドルウェア
 MIDDLEWARE = [
-    "django.middleware.security.SecurityMiddleware",
-    "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -89,24 +85,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-
-# https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
-
-AUTH_PASSWORD_VALIDATORS = [
-    {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
-    },
-]
-
 # データベース設定
 DATABASES = {
     "default": {
@@ -119,82 +97,55 @@ DATABASES = {
     }
 }
 
-# Internationalization
-# https://docs.djangoproject.com/en/4.2/topics/i18n/
+# 認証
+AUTH_USER_MODEL = "accounts.User"
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"
+    },
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
+
+# ロケール設定
 LANGUAGE_CODE = "ja"
-
 TIME_ZONE = "Asia/Tokyo"
-
 USE_I18N = True
-
 USE_TZ = True
 
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/4.2/howto/static-files/
-
-# 静的ファイル設定
+# 静的ファイル
 STATIC_URL = "/static/"
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 
-# メディアファイル設定
-MEDIA_URL = "/media/"
-MEDIA_ROOT = os.path.join(BASE_DIR, "media")
-
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-
-# 本番環境
+# S3設定
+# settings.py
 if not DEBUG:
-    STATIC_URL = "/static/"
-    STATIC_ROOT = "/var/www/{}/static".format(BASE_DIR.name)
-    MEDIA_URL = "/media/"
-    MEDIA_ROOT = "/var/www/{}/media".format(BASE_DIR.name)
-    DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+    AWS_ACCESS_KEY_ID = config("AWS_ACCESS_KEY_ID", default="")
+    AWS_SECRET_ACCESS_KEY = config("AWS_SECRET_ACCESS_KEY", default="")
+    AWS_STORAGE_BUCKET_NAME = config("AWS_STORAGE_BUCKET_NAME", default="")
+    AWS_S3_REGION_NAME = config("AWS_S3_REGION_NAME", default="ap-northeast-1")
 
-
-# Default primary key field type
-# https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
-
-
-# 本番環境でのAWS S3設定
-if not DEBUG:
-    AWS_ACCESS_KEY_ID = config("AWS_ACCESS_KEY_ID")
-    AWS_SECRET_ACCESS_KEY = config("AWS_SECRET_ACCESS_KEY")
-    AWS_STORAGE_BUCKET_NAME = config("AWS_STORAGE_BUCKET_NAME")
     DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
-    S3_URL = f"http://{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com/"
-    MEDIA_URL = S3_URL
     AWS_S3_FILE_OVERWRITE = False
     AWS_DEFAULT_ACL = None
+    AWS_QUERYSTRING_AUTH = False  # S3オブジェクトの公開URLを有効にする場合
+    MEDIA_URL = (
+        f"https://{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com/"
+    )
 
-# AWS_ACCESS_KEY_ID = config('AWS_ACCESS_KEY_ID')
-# AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_ACCESS_KEY')
-# AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME')
+else:
+    MEDIA_URL = "/media/"
+    MEDIA_ROOT = os.path.join(BASE_DIR, "mediafiles")
 
-# DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-# S3_URL = 'http://%s.s3.amazonaws.com/' % AWS_STORAGE_BUCKET_NAME
-# MEDIA_URL = S3_URL
+# REST Framework
+REST_FRAMEWORK = {
+    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication"
+    ],
+}
 
-
-# settings.py
-
-
-# CORS
-# すべてのサイトを許可
-CORS_ORIGIN_ALLOW_ALL = True
-
-# CORS_ALLOWED_ORIGINS = [
-#     "http://localhost:3000",
-#     "http://localhost:8000",
-#     "https://mear.vercel.app",
-# ]
-#
-# CORS_ALLOWED_WHITELIST = [
-#     "http://localhost:3000",
-#     "http://localhost:8000",
-#     "https://mear.vercel.app",
-# ]
-
-# JWT
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
@@ -203,81 +154,83 @@ SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ("JWT",),
 }
 
-# AUTH_USER_MODEL： カスタマイズしたユーザーモデルを指定
-AUTH_USER_MODEL = "accounts.User"
+if not DEBUG:
+    # CORS設定
+    CORS_ALLOWED_ORIGINS = config(
+        "CORS_ALLOWED_ORIGINS", default="https://mear.vercel.app"
+    ).split(",")
+    CORS_ALLOW_CREDENTIALS = True
+    CORS_PREFLIGHT_MAX_AGE = 60 * 30
+    CORS_ALLOW_HEADERS = list(default_headers) + [
+        "access-control-allow-origin",
+    ]
+else:
+    # CORS設定
+    CORS_ORIGIN_ALLOW_ALL = True
 
-# DRF
-REST_FRAMEWORK = {
-    # viewを特定のユーザにだけ見せるようにする
-    "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.IsAuthenticated",
-    ],
-    # 認証方法を指定する
-    "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework_simplejwt.authentication.JWTAuthentication"
-    ],
-}
+CSRF_TRUSTED_ORIGINS = config(
+    "CSRF_TRUSTED_ORIGINS",
+    default="http://localhost:3000,http://localhost:8000,https://mear.vercel.app,https://api.mear-app.com",
+).split(",")
 
-# Fileのアップロード上限
-DATA_UPLOAD_MAX_MEMORY_SIZE = 41943040  # 30 MB
-FILE_UPLOAD_MAX_MEMORY_SIZE = 41943040  # 30 MB
 
-# CSRFトークンの設定
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:3000",
-    "http://localhost:8000",
-    "https://mear.vercel.app",
-    "https://api.mear-app.com",
-]
+if not DEBUG:
+    LOGGING = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "filters": {
+            "require_debug_false": {"()": "django.utils.log.RequireDebugFalse"},
+            "require_debug_true": {"()": "django.utils.log.RequireDebugTrue"},
+        },
+        "formatters": {
+            "verbose": {
+                "format": "%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s"
+            },
+        },
+        "handlers": {
+            "console": {
+                "level": "INFO",
+                "filters": ["require_debug_true"],
+                "class": "logging.StreamHandler",
+                "formatter": "verbose",
+            },
+        },
+        "loggers": {
+            "django": {
+                "handlers": ["console"],
+                "level": "INFO",
+            },
+        },
+    }
+else:
+    LOGGING = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "filters": {
+            "require_debug_false": {"()": "django.utils.log.RequireDebugFalse"},
+            "require_debug_true": {"()": "django.utils.log.RequireDebugTrue"},
+        },
+        "formatters": {
+            "verbose": {
+                "format": "%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s"
+            },
+        },
+        "handlers": {
+            "console": {
+                "level": "DEBUG",
+                "filters": ["require_debug_true"],
+                "class": "logging.StreamHandler",
+                "formatter": "verbose",
+            },
+        },
+        "loggers": {
+            "django": {
+                "handlers": ["console"],
+                "level": "DEBUG",
+                "progate": True,
+            },
+        },
+    }
 
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "filters": {
-        "require_debug_false": {
-            "()": "django.utils.log.RequireDebugFalse",
-        },
-        "require_debug_true": {
-            "()": "django.utils.log.RequireDebugTrue",
-        },
-    },
-    "formatters": {
-        "django.server": {
-            "()": "django.utils.log.ServerFormatter",
-            "format": "[%(server_time)s] %(message)s a",
-        },
-        "verbose": {
-            "format": "%(levelname)s %(asctime)s %(module)s "
-            "%(process)d %(thread)d %(message)s"
-        },
-    },
-    "handlers": {
-        "console": {
-            "level": "INFO",
-            "filters": ["require_debug_true"],
-            "class": "logging.StreamHandler",
-            "formatter": "verbose",
-        },
-        "django.server": {
-            "level": "INFO",
-            "class": "logging.StreamHandler",
-            "formatter": "django.server",
-        },
-        "mail_admins": {
-            "level": "ERROR",
-            "filters": ["require_debug_false"],
-            "class": "django.utils.log.AdminEmailHandler",
-        },
-    },
-    "loggers": {
-        "django": {
-            "handlers": ["console", "mail_admins"],
-            "level": "INFO",
-        },
-        "django.server": {
-            "handlers": ["django.server"],
-            "level": "INFO",
-            "propagate": False,
-        },
-    },
-}
+DATA_UPLOAD_MAX_MEMORY_SIZE = 30 * 1024 * 1024  # 30MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 30 * 1024 * 1024  # 30MB
